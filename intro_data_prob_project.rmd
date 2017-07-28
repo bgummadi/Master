@@ -1,0 +1,145 @@
+---
+title: "Exploring the BRFSS data by Bindu G"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `brfss2013`. 
+
+```{r load-data}
+load("C:/temp/brfss2013.RData")
+```
+Try to understand how big/wide the dataset is to guaze the peformance of different analysis we are going to accomplish
+```{ r Dimesnsions of dataset }
+dim(brfss2013) 
+```
+##[1] 491775    330
+* * *
+
+## Part 1: Data
+
+Data:
+BRFSS measured behavioral risk factors for non-institutionalized adult population (18 years of age and older) residing in US.  Data was collected using landline and cellular telephone services.
+
+In landline telephone survey, data is collected from a randomly selected adult in house hold by disproportionate stratified sampling. In cellular telephone survey interviewers collect data from an adult who resides in a private residence or college housing by simple random sampling which is not as efficient as the stratified sampling used for landline telephone survey.
+
+Since random sampling is used, results can be generalized for the adults in US only but a causal inference can't be made as there is no random assignment of individuals. Also,there may be bias in answering the questions about health conditions in lieu of privacy
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+Any relation between age, gender and cholestrol?
+Does over weight people have high cholestrol as they get old? Is it more in men/women?
+
+We assume that people who are having more weight than normal (fat people) will have higher chance of having cholestrol as they grow older in age. 
+
+**Research quesion 2:**
+
+Does income earned impacts the health coverage?
+It is general notion that majority of high earning people will opt for health care than people who have lower income.
+
+**Research quesion 3:**
+Is there any relationship between people's sleeping habits and health condition (physical/mental)?
+
+we suppose that people who had average 6-8 hours sleep a day will have better physical and mental health. 
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+**Research quesion 1:**
+
+variables to consider are-
+employ1: to figure out older people aka retired
+X_bmi5: calculated bmi field which helps to show if people are over weight/fat
+toldhi2: told blood cholestrol high
+sex: male/female
+we will consider only yes/no options for cholestrol indicator
+we will compute bmi percentage
+
+```{r}
+chol_bmi <-  brfss2013 %>% filter(employ1 == "Retired") %>% select(X_bmi5,toldhi2,sex) %>% filter(toldhi2 %in% c("Yes","No")) %>% mutate(bmi = X_bmi5/100)
+```
+
+chart the data as box plots to identify the trend of bmi among different sex
+
+```{r}
+ggplot(chol_bmi, aes(x = sex, y = bmi, fill = toldhi2)) + geom_boxplot() + ggtitle("Cholestrol and BMI")
+```
+
+It can be summarised from the plot (median) that both men and women told to have high cholestrol have highre BMI than people who are not being told among retired people. so it is evident that as over weight people (both men & women) get older they would have a chance of being told to have high cholestrol. Also, female population,older people with high cholestrol, have high variablity (IQR is wider than men).
+
+**Research quesion 2:**
+
+Variables to consider are-
+hlthpln1: if people have a health plan or not
+X_incomg: calculated income field that categorizes different income levels
+
+we will consider only yes/no options for hlthpln1 and valid/non missing values for incomes earned
+we will count the number of people that are earning and have a health coverage or not
+
+```{r}
+hcov_inc <- brfss2013 %>% filter(!is.na(X_incomg),!is.na(hlthpln1)) %>% group_by(X_incomg,hlthpln1) %>% summarise(count=n())
+```
+Plot income levels vs healthplan coverage
+
+```{r}
+ggplot(hcov_inc, aes(X_incomg), y=count) +
+    geom_bar(aes(fill = hlthpln1, weight = count),  width = .7, color="black") + theme(axis.text.x = element_text(vjust=0.6,angle=-45))
+```
+
+Through the plot we can see that having health coverage 'yes' is more among the people who have more income. Ratio of having a helath coverage is high among high earning individuals, income more than 50000.
+
+**Research quesion 3:**
+
+variables to consider are-
+menthlth: no of days mental health not good 
+physhlth: no of days mental health not good
+sleptim1:hours of sleep time
+
+we will consider only 24 hours or less of sleep time as a day has only 24 hours.
+Also, consider only the no of days of bad health (physica/mental) is less than or 30.
+we then calcualte the average days of poor/bad mental and phsyical health
+
+```{r}
+sleep_hlth <- brfss2013 %>% filter(menthlth<30) %>% filter (physhlth<30) %>% filter (sleptim1<=24) %>% group_by(sleep_time=as.factor(sleptim1)) %>% summarise(bad_ment_hlth=mean(menthlth),bad_phys_hlth=mean(physhlth))
+```
+
+Reshape the data for creating comparative plots. Rename the 'value' to average_days to represent the mean of poor health days
+
+```{r}
+sleep_hlth <-melt(sleep_hlth)
+names(sleep_hlth)[3] <- "Average_days"
+```
+
+plot the comparative histograms
+
+```{r}
+ggplot(sleep_hlth,aes(x=sleep_time,y=Average_days,fill=variable)) + geom_bar(stat="identity",width=1,position="dodge")
+```
+
+
+It is evident from the plot that the people who sleep between 6-8 hours a day have lower days of poor physical or mental health issues (less than 2 days in a month). so, we can generlise that better sleeping habits in adults help to have better phsyical and mental health.
